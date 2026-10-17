@@ -9,9 +9,9 @@ and answers with generative UI - it picks components from a fixed catalog
 
 - Streamlit + Plotly for the UI
 - pandas + SQLite for storage (team's pick; swap later if needed)
-- Any OpenAI-compatible free-tier LLM via env vars - defaults to Groq's
-  free tier (Llama 3.3 70B); OpenRouter free models (Gemma etc.) and
-  Google AI Studio's Gemini free tier also work, see `.env.example`
+- Any OpenAI-compatible free-tier LLM via env vars - defaults to Google
+  AI Studio's Gemini free tier (gemini-3.8-flash); Groq and OpenRouter
+  free models (Gemma etc.) also work, see `.env.example`
 - No key yet? The app runs in offline demo mode (pattern-matched answers)
   so the UI still demos end to end.
 
