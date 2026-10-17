@@ -256,6 +256,18 @@ for msg in st.session_state.messages:
     render_message(msg)
 
 def handle(q):
+    q = q.strip()[:2000]
+    if not q:
+        return
+    # basic abuse guard: 30 questions per 5 minutes per session
+    import time as _t
+    now = _t.time()
+    win = [t for t in st.session_state.get('q_times', []) if now - t < 300]
+    if len(win) >= 30:
+        with st.chat_message("assistant"):
+            st.markdown("That's a lot of questions in a few minutes — give me a moment and ask again.")
+        return
+    win.append(now); st.session_state.q_times = win
     st.session_state.messages.append({'role': 'user', 'text': q})
     with st.chat_message("user"): st.markdown(q)
     with st.chat_message("assistant"):
@@ -266,13 +278,20 @@ def handle(q):
             router.log_chat(user['user_id'], 'user', q)
             router.log_chat(user['user_id'], 'assistant', resp['text'] + ' ' +
                             ' '.join(r.get('Well','') for r in (resp.get('data') or {}).get('table', []) if isinstance(r, dict)))
-        st.markdown(resp['text'])
+        import re as _re
+        non_en = _re.search(r'[\u0900-\u097F]', q)
+        translated = router.translate(resp['text'], "the same language as this question: " + q[:60]) if (non_en and router.llm) else None
+        shown = translated or resp['text']
+        st.markdown(shown)
+        if translated:
+            with st.expander("Original answer (English)"):
+                st.markdown(resp['text'])
         render_visual(resp)
         if resp.get('evidence'):
             with st.expander(f"Evidence · {len(resp['evidence'])} records"):
                 for e in resp['evidence'][:12]:
                     st.caption("• " + str(e))
-    st.session_state.messages.append({'role': 'assistant', 'text': resp['text'], 'resp': resp, 'evidence': resp.get('evidence')})
+    st.session_state.messages.append({'role': 'assistant', 'text': shown, 'resp': resp, 'evidence': resp.get('evidence')})
 
 did_handle = False
 pending = st.session_state.get('pending_q')

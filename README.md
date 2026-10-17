@@ -112,6 +112,40 @@ python3 tests/verify_scenarios.py
 # 23/23 checks passed against sample-data
 ```
 
+## Security
+
+- **The LLM can only pick tools, never run code.** Planner output is validated
+  against a fixed whitelist of deterministic analytics tools with plain-data
+  arguments; anything else is dropped to a safe default. Text it reads (notes,
+  reports, chat history) is data, not instructions.
+- **Parameterized SQL everywhere** (verified by `tests/test_security.py`), input
+  length caps, and a per-session question rate limit in the app.
+- **No secrets in the repo.** The LLM key is read from the environment
+  (Streamlit Cloud secrets in production). Dataset access is read-only by
+  design: the only write paths are the intended memory tables (chat history,
+  corrections, team notes).
+
+## Regional languages
+
+Questions in **Hindi and Marathi** (Devanagari) are routed by the LLM planner to
+the same deterministic engine, and the answer is translated back into the
+question's language — record IDs, well IDs, numbers and rule codes stay
+untouched (the English original is one tap away). Without an LLM key the app
+answers in English only.
+
+## Feasibility and cost
+
+- **Cost to run: USD 0.** Streamlit Community Cloud (free), Gemini API free tier
+  (planner + translation), SQLite, no paid APIs, no training.
+- **Hardware: any laptop.** The full 200-well dataset loads into SQLite in about
+  a second; answers are SQL, not inference.
+- **Model-agnostic planner.** Any OpenAI-compatible endpoint via
+  `LLM_BASE_URL`/`LLM_MODEL`. The planner is verified with `gemini-3.8-flash`
+  (default); Google's open-weight **Gemma 4** (`gemma-4-31b-it`) is reachable on
+  the same free endpoint — set `LLM_MODEL` to swap — and local models (e.g.
+  Ollama `gemma4:e2b`) work the same way. With no key at all, the deterministic
+  router covers every intent offline — the demo can never hard-fail.
+
 ## Tech stack
 
 - **Python**, **Streamlit** (generative UI + hosting on Streamlit Community Cloud)

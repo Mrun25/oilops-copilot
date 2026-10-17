@@ -107,24 +107,52 @@ History with this user (may contain referenced wells): {hist}
 JSON only:"""
 
     def plan_llm(self, msg, user_name, history):
+        msg = msg[:2000]  # input cap: oversized questions are truncated, never crash
         try:
             import urllib.request
             hist = ' | '.join(h['text'][:120] for h in history[-8:])
             body = {"model": self.llm['model'], "messages": [
                 {"role": "user", "content": self.PLANNER_PROMPT.format(today=TODAY.isoformat(), user=user_name, msg=msg, hist=hist)}],
-                "temperature": 0}
+                "temperature": 0, "max_tokens": 1200}
             req = urllib.request.Request(self.llm['base_url'].rstrip('/') + '/chat/completions',
                 data=json.dumps(body).encode(), headers={'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + self.llm['api_key']})
-            with urllib.request.urlopen(req, timeout=30) as r:
+            with urllib.request.urlopen(req, timeout=75) as r:
                 txt = json.load(r)['choices'][0]['message']['content']
             m = re.search(r'\{.*\}', txt, re.S)
-            plan = json.loads(m.group(0))
+            raw = m.group(0)
+            try:
+                plan = json.loads(raw)
+            except json.JSONDecodeError:
+                import ast  # some open models answer with single-quoted dicts
+                plan = ast.literal_eval(raw)
             if 'tool' in plan: return self.normalize(plan, msg)
         except Exception as ex:
             print('LLM plan failed:', ex)
         return None
 
+
+    def translate(self, text, lang_hint):
+        """Translate an answer into the user's language (e.g. Hindi/Marathi).
+        Record IDs, well IDs, numbers and rule names stay untouched. Returns None on failure."""
+        if not self.llm:
+            return None
+        try:
+            import urllib.request
+            body = {"model": self.llm['model'], "messages": [{"role": "user", "content":
+                f"Translate the following answer into {lang_hint}. Keep every record ID, well ID, "
+                f"number, date, name and rule code (like SR-01, T200) exactly as-is. "
+                f"Output only the translation, no commentary.\n\n" + text}],
+                "temperature": 0, "max_tokens": 1500}
+            req = urllib.request.Request(self.llm['base_url'].rstrip('/') + '/chat/completions',
+                data=json.dumps(body).encode(), headers={'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + self.llm['api_key']})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                out = json.load(r)['choices'][0]['message']['content'].strip()
+            return out or None
+        except Exception as ex:
+            print('translate failed:', ex)
+            return None
 
     def normalize(self, plan, msg):
         """Fill IDs the LLM planner dropped, using regex over the raw message."""
@@ -142,6 +170,7 @@ JSON only:"""
 
     # ---------- deterministic fallback planner ----------
     def plan_rules(self, msg):
+        msg = msg[:2000]
         m = msg.lower()
         wells = [w.upper() for w in WELL_RE.findall(msg)]
         area_m = AREA_RE.search(msg)

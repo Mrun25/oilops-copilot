@@ -13,9 +13,19 @@ class Executor:
         self.r = router
         self.eng = router.eng
 
+    # Security: a plan may only name one of these executor tools, with plain-data args.
+    # LLM planners (and any text they read in notes/history) can therefore never reach
+    # code execution, the filesystem, or the network - only these fixed analytics.
+    def _allowed_tools(self):
+        return {n[3:] for n in dir(self) if n.startswith('do_')}
+
     def run(self, plan, user_id, user_name, raw_msg):
         t = plan.get('tool')
-        fn = getattr(self, 'do_' + (t or 'general'), None) or self.do_general
+        if t not in self._allowed_tools():
+            t = 'general'
+        safe = {k: v for k, v in plan.items() if isinstance(v, (str, int, float, bool, list, type(None)))}
+        plan = dict(safe, tool=t)
+        fn = getattr(self, 'do_' + t, None) or self.do_general
         return fn(plan, user_id, user_name, raw_msg)
 
     # ---------- helpers ----------
