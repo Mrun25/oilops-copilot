@@ -146,8 +146,9 @@ class Executor:
                 'evidence': ['weekly inspections × 7 days per Dataset Guide']}
 
     def do_spill_heatmap(self, plan, user_id, user_name, raw):
-        grid = self.eng.spill_heatmap(int(plan.get('year') or TODAY.year))
-        txt = f"**{plan.get('year')} spills by area and month** (corrected detections removed, per SOP-SR §7)."
+        year = int(plan.get('year') or TODAY.year)
+        grid = self.eng.spill_heatmap(year)
+        txt = f"**{year} spills by area and month** (corrected detections removed, per SOP-SR §7)."
         return {'text': txt, 'visual': 'heatmap', 'data': {'grid': grid},
                 'evidence': ['inspections.spill_detected', 'context.jsonl corrections', 'SOP-SR §7']}
 
