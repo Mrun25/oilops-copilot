@@ -106,31 +106,49 @@ User message ({user}): {msg}
 History with this user (may contain referenced wells): {hist}
 JSON only:"""
 
+
+    # Free-tier fallback chain: if the primary model keeps 503/429ing, try the
+    # next free model on the same endpoint. Override with LLM_FALLBACK_MODELS
+    # (comma-separated). The first working model is remembered per process.
+    FALLBACK_MODELS = ["gemini-3.8-flash-lite", "gemma-4-31b-it"]
+
+    def _chat(self, messages, max_tokens, timeout=75):
+        """POST chat/completions with retry + free-model fallback. Returns content str or None."""
+        import urllib.request, urllib.error, os
+        extra = os.environ.get('LLM_FALLBACK_MODELS', '')
+        models = [self.llm['model']] + [m.strip() for m in extra.split(',') if m.strip()] + list(self.FALLBACK_MODELS)
+        seen = set(); models = [m for m in models if m and not (m in seen or seen.add(m))]
+        start = min(getattr(self, '_model_idx', 0), len(models) - 1)
+        order = models[start:] + models[:start]
+        for model in order:
+            for attempt in range(2):
+                try:
+                    body = {"model": model, "messages": messages, "temperature": 0, "max_tokens": max_tokens}
+                    req = urllib.request.Request(self.llm['base_url'].rstrip('/') + '/chat/completions',
+                        data=json.dumps(body).encode(), headers={'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + self.llm['api_key']})
+                    with urllib.request.urlopen(req, timeout=timeout) as r:
+                        self._model_idx = models.index(model)
+                        if model != self.llm['model']:
+                            print('LLM fallback model in use:', model)
+                        return json.load(r)['choices'][0]['message']['content']
+                except urllib.error.HTTPError as e:
+                    if e.code in (429, 500, 502, 503, 504) and attempt == 0:
+                        import time as _t; _t.sleep(3)
+                        continue
+                    break  # next model
+                except Exception:
+                    break
+        return None
+
     def plan_llm(self, msg, user_name, history):
         msg = msg[:2000]  # input cap: oversized questions are truncated, never crash
         try:
-            import urllib.request
             hist = ' | '.join(h['text'][:120] for h in history[-8:])
-            body = {"model": self.llm['model'], "messages": [
-                {"role": "user", "content": self.PLANNER_PROMPT.format(today=TODAY.isoformat(), user=user_name, msg=msg, hist=hist)}],
-                "temperature": 0, "max_tokens": 1200}
-            req = urllib.request.Request(self.llm['base_url'].rstrip('/') + '/chat/completions',
-                data=json.dumps(body).encode(), headers={'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + self.llm['api_key']})
-            resp = None
-            for attempt in range(3):
-                try:
-                    resp = urllib.request.urlopen(req, timeout=75)
-                    break
-                except urllib.error.HTTPError as e:
-                    if e.code in (429, 500, 502, 503, 504) and attempt < 2:
-                        import time as _t; _t.sleep(4 * (attempt + 1))
-                        continue
-                    raise
-            if resp is None:
+            txt = self._chat([{"role": "user", "content": self.PLANNER_PROMPT.format(
+                today=TODAY.isoformat(), user=user_name, msg=msg, hist=hist)}], 1200, timeout=75)
+            if txt is None:
                 return None
-            with resp as r:
-                txt = json.load(r)['choices'][0]['message']['content']
             m = re.search(r'\{.*\}', txt, re.S)
             raw = m.group(0)
             try:
@@ -150,29 +168,13 @@ JSON only:"""
         if not self.llm:
             return None
         try:
-            import urllib.request
-            body = {"model": self.llm['model'], "messages": [{"role": "user", "content":
+            out = self._chat([{"role": "user", "content":
                 f"Translate the following answer into {lang_hint}. Keep every record ID, well ID, "
                 f"number, date, name and rule code (like SR-01, T200) exactly as-is. "
-                f"Output only the translation, no commentary.\n\n" + text}],
-                "temperature": 0, "max_tokens": 1500}
-            req = urllib.request.Request(self.llm['base_url'].rstrip('/') + '/chat/completions',
-                data=json.dumps(body).encode(), headers={'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + self.llm['api_key']})
-            resp = None
-            for attempt in range(3):
-                try:
-                    resp = urllib.request.urlopen(req, timeout=60)
-                    break
-                except urllib.error.HTTPError as e:
-                    if e.code in (429, 500, 502, 503, 504) and attempt < 2:
-                        import time as _t; _t.sleep(4 * (attempt + 1))
-                        continue
-                    raise
-            if resp is None:
+                f"Output only the translation, no commentary.\n\n" + text}], 1500, timeout=60)
+            if out is None:
                 return None
-            with resp as r:
-                out = json.load(r)['choices'][0]['message']['content'].strip()
+            out = out.strip()
             return out or None
         except Exception as ex:
             print('translate failed:', ex)
