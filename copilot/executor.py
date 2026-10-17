@@ -320,10 +320,11 @@ class Executor:
         insp_id = li['inspection_id']
         original = li.get(field)
         if field in ('wellhead_temp_c', 'ambient_temp_c', 'spill_est_volume_liters'):
-            try:
-                newv = float(newv)
-            except (TypeError, ValueError):
+            import re as _re
+            _m = _re.search(r'-?\d+(?:\.\d+)?', str(newv) if newv is not None else '')
+            if not _m:
                 return {'text': 'I could not read a numeric value for that correction. Try again with the number, for example: re-measured 41.0 C.', 'evidence': []}
+            newv = float(_m.group(0))
         self.r.add_correction('inspection', insp_id, field, original, newv, user_id, plan.get('reason') or raw)
         eff = self.eng.corrected_inspection(li)
         w = self.eng.well(aid)
