@@ -1,9 +1,10 @@
+import os
 """Deterministic analytics over the asset DB. Every function returns data + evidence IDs.
 Rules (thresholds, deadlines) come from the manuals/SOPs in docs; see RULES."""
 import sqlite3, re
 from datetime import date, datetime, timedelta
 
-TODAY = date(2026, 10, 16)  # per 03-evaluation-queries.md; dataset-dependent
+TODAY = date.fromisoformat(os.environ.get('COPILOT_TODAY', '2026-10-16'))  # dataset-dependent: sample=2026-10-16, test=2027-01-15
 
 # Rules extracted from fleet/well-types/*.md and fleet/sops/*.md (cited in answers)
 RULES = {
