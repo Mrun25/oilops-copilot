@@ -120,10 +120,25 @@ JSON only:"""
                 txt = json.load(r)['choices'][0]['message']['content']
             m = re.search(r'\{.*\}', txt, re.S)
             plan = json.loads(m.group(0))
-            if 'tool' in plan: return plan
+            if 'tool' in plan: return self.normalize(plan, msg)
         except Exception as ex:
             print('LLM plan failed:', ex)
         return None
+
+
+    def normalize(self, plan, msg):
+        """Fill IDs the LLM planner dropped, using regex over the raw message."""
+        wells = [w.upper() for w in WELL_RE.findall(msg)]
+        if plan.get('asset_id') is None and wells:
+            plan['asset_id'] = wells[0]
+        if plan.get('tool') == 'repair_costs' and not plan.get('asset_ids') and wells:
+            plan['asset_ids'] = wells
+        if plan.get('asset_id'):
+            plan['asset_id'] = str(plan['asset_id']).upper()
+        am = AREA_RE.search(msg)
+        if plan.get('area') is None and am:
+            plan['area'] = am.group(1)
+        return plan
 
     # ---------- deterministic fallback planner ----------
     def plan_rules(self, msg):

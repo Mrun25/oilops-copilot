@@ -30,7 +30,9 @@ class Executor:
 
     # ---------- handlers ----------
     def do_well_status(self, plan, user_id, user_name, raw):
-        aid = plan['asset_id']
+        aid = plan.get('asset_id')
+        if not aid:
+            return {'text': "Which well do you mean? Give me an ID like WELL-0001.", 'visual': 'text', 'data': {}, 'evidence': []}
         s = self.eng.well_status(aid)
         w, i = s['well'], s['inspection']
         ev = [i['inspection_id'], f"OM-{w['well_type']} production temperature rule"]
