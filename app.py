@@ -63,7 +63,8 @@ names = {u['name']: u for u in users}
 
 def kpi(sql, args=()):
     try:
-        return router.eng.q(sql, args)[0][0]
+        row = router.eng.q(sql, args)[0]
+        return list(row.values())[0]
     except Exception:
         return None
 
@@ -72,7 +73,7 @@ n_insp  = kpi("SELECT COUNT(*) FROM inspections")
 n_notes = kpi("SELECT COUNT(*) FROM notes")
 last_insp = None
 try:
-    last_insp = router.eng.q("SELECT MAX(inspected_at) FROM inspections")[0][0][:10]
+    last_insp = list(router.eng.q("SELECT MAX(inspected_at) FROM inspections")[0].values())[0][:10]
 except Exception:
     pass
 
