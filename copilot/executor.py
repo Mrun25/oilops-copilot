@@ -319,6 +319,11 @@ class Executor:
         li = self._resolve_inspection(aid, raw, field)
         insp_id = li['inspection_id']
         original = li.get(field)
+        if field in ('wellhead_temp_c', 'ambient_temp_c', 'spill_est_volume_liters'):
+            try:
+                newv = float(newv)
+            except (TypeError, ValueError):
+                return {'text': 'I could not read a numeric value for that correction. Try again with the number, for example: re-measured 41.0 C.', 'evidence': []}
         self.r.add_correction('inspection', insp_id, field, original, newv, user_id, plan.get('reason') or raw)
         eff = self.eng.corrected_inspection(li)
         w = self.eng.well(aid)

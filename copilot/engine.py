@@ -57,7 +57,10 @@ class Engine:
             if f == 'spill_negated':
                 eff['negated'] = True
             elif f in ('wellhead_temp_c', 'ambient_temp_c', 'spill_est_volume_bbl'):
-                eff[f] = float(c['corrected_value'])
+                try:
+                    eff[f] = float(c['corrected_value'])
+                except (TypeError, ValueError):
+                    continue  # ignore malformed correction rows instead of crashing
             eff['corrections'].append({'by': c['author_user_id'], 'text': c['reason'], 'source': 'runtime correction'})
         return eff
 
