@@ -117,7 +117,19 @@ JSON only:"""
             req = urllib.request.Request(self.llm['base_url'].rstrip('/') + '/chat/completions',
                 data=json.dumps(body).encode(), headers={'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + self.llm['api_key']})
-            with urllib.request.urlopen(req, timeout=75) as r:
+            resp = None
+            for attempt in range(3):
+                try:
+                    resp = urllib.request.urlopen(req, timeout=75)
+                    break
+                except urllib.error.HTTPError as e:
+                    if e.code in (429, 500, 502, 503, 504) and attempt < 2:
+                        import time as _t; _t.sleep(4 * (attempt + 1))
+                        continue
+                    raise
+            if resp is None:
+                return None
+            with resp as r:
                 txt = json.load(r)['choices'][0]['message']['content']
             m = re.search(r'\{.*\}', txt, re.S)
             raw = m.group(0)
@@ -147,7 +159,19 @@ JSON only:"""
             req = urllib.request.Request(self.llm['base_url'].rstrip('/') + '/chat/completions',
                 data=json.dumps(body).encode(), headers={'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + self.llm['api_key']})
-            with urllib.request.urlopen(req, timeout=60) as r:
+            resp = None
+            for attempt in range(3):
+                try:
+                    resp = urllib.request.urlopen(req, timeout=60)
+                    break
+                except urllib.error.HTTPError as e:
+                    if e.code in (429, 500, 502, 503, 504) and attempt < 2:
+                        import time as _t; _t.sleep(4 * (attempt + 1))
+                        continue
+                    raise
+            if resp is None:
+                return None
+            with resp as r:
                 out = json.load(r)['choices'][0]['message']['content'].strip()
             return out or None
         except Exception as ex:
