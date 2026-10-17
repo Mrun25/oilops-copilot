@@ -188,7 +188,9 @@ class Executor:
         parts = [f"{r['asset_id']} ({r['well_type']}, {r['count']} corrective repairs)" for r in rows]
         txt = (f"**Wells in {plan['area']} needing a root-cause analysis on their {plan.get('equipment_kind') or 'pump_jack'}:** "
                + ', '.join(parts) + '.')
-        rule = self.eng.feedback_rule('rca_count')
+        rule = None
+        for rr in self.eng.q("SELECT * FROM feedback_rules WHERE rule_key='rca_count' ORDER BY id DESC"):
+            rule = rr; break
         if rule:
             txt += (f" This applies {_user_name(self.eng, rule['author_user_id'])}'s team rule "
                     f"(RCA after {rule['rule_value']} repairs for {rule['scope_id']} wells), not just the manual's 3-repair rule.")
@@ -208,7 +210,7 @@ class Executor:
         return {'text': txt, 'visual': plan.get('visual') or 'table', 'data': {'table': rows}, 'evidence': ['maintenance.jsonl cost_usd']}
 
     def do_recall_costs(self, plan, user_id, user_name, raw):
-        wells = self.r.wells_discussed(user_id)[:3]
+        wells = self.r.wells_discussed_set(user_id)[:3]
         if not wells:
             return {'text': "I don't have an earlier conversation with you about any wells — my memory of past chats is private to each user. Tell me the well IDs and I'll pull the numbers.",
                     'visual': 'text', 'data': {}, 'evidence': []}
@@ -268,6 +270,26 @@ class Executor:
                     'visual': 'text', 'data': {}, 'evidence': [n.get('note_id') or 'context note']}
         return {'text': f"No planned downtime is recorded for {aid}.", 'visual': 'text', 'data': {}, 'evidence': []}
 
+
+    def _resolve_inspection(self, aid, raw, field):
+        """Pick the inspection a correction refers to: match a date named in the message
+        ('24 Sep', '15 Oct', '2026-09-24'); for spill-volume corrections prefer inspections
+        with spill_detected; otherwise the latest inspection."""
+        months = {'jan':1,'feb':2,'mar':3,'apr':4,'may':5,'jun':6,'jul':7,'aug':8,'sep':9,'oct':10,'nov':11,'dec':12}
+        target_date = None
+        dm = re.search(r'(\d{1,2})\s*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*', raw.lower())
+        iso = re.search(r'(20\d\d)-(\d{2})-(\d{2})', raw)
+        if iso: target_date = iso.group(0)
+        elif dm: target_date = f"{TODAY.year}-{months[dm.group(2)[:3]]:02d}-{int(dm.group(1)):02d}"
+        if field == 'spill_est_volume_bbl':
+            cands = self.eng.q("SELECT * FROM inspections WHERE asset_id=? AND spill_detected=1 ORDER BY inspected_at DESC", (aid,))
+        else:
+            cands = self.eng.q("SELECT * FROM inspections WHERE asset_id=? ORDER BY inspected_at DESC", (aid,))
+        if target_date:
+            for c in cands:
+                if c['inspected_at'][:10] == target_date: return c
+        return cands[0] if cands else self.eng.latest_inspection(aid)
+
     # ---------- feedback handlers ----------
     def do_remember_fact(self, plan, user_id, user_name, raw):
         aid = plan.get('asset_id')
@@ -279,8 +301,9 @@ class Executor:
         aid = plan.get('asset_id')
         field = plan.get('field') or 'wellhead_temp_c'
         newv = plan.get('new_value')
-        # resolve the inspection: latest one, or by date mentioned
-        li = self.eng.latest_inspection(aid)
+        # resolve the inspection: a date mentioned in the message wins; for spill-volume
+        # corrections the target is the spill inspection, not the latest reading
+        li = self._resolve_inspection(aid, raw, field)
         insp_id = li['inspection_id']
         original = li.get(field)
         self.r.add_correction('inspection', insp_id, field, original, newv, user_id, plan.get('reason') or raw)

@@ -40,6 +40,19 @@ class Router:
                 if w not in seen: seen.append(w)
         return seen
 
+    def wells_discussed_set(self, user_id):
+        """The latest prior ASSISTANT answer in this user's own history that discussed
+        a set of >=2 wells (e.g. 'the three wells we discussed yesterday'). Empty if this
+        user never had such a conversation — never borrow another user's."""
+        for m in self.user_history(user_id)[::-1]:  # newest first
+            if m['role'] != 'assistant': continue
+            seen = []
+            for w in WELL_RE.findall(m['text']):
+                w = w.upper()
+                if w not in seen: seen.append(w)
+            if len(seen) >= 2: return seen
+        return []
+
     def users(self):
         return self.eng.q("SELECT * FROM users ORDER BY user_id")
 
