@@ -1,0 +1,51 @@
+# Asset Intelligence Copilot
+
+> A chat copilot, built for the FlytBase Hack Day Asset Health Challenge (17 Oct
+> 2026), that answers operators' plain-English questions about a fleet of 200 oil
+> wells with computed, evidence-backed answers rendered as generative UI (status
+> cards, tables, line/bar charts, spill maps, heatmaps).
+
+Questions are routed to deterministic analytics tools over a SQLite database
+loaded from the organizers' dataset folder format; an optional Gemini planner
+(free tier, OpenAI-compatible endpoint) maps questions to tools, with a
+deterministic rule-based fallback so the app runs at zero cost. Production,
+spill-response and compliance rules are encoded from the dataset's own manuals
+and SOPs (OM-T200/OM-T350, SOP-SR, SOP-RC) and cited in answers. The copilot
+keeps per-user private conversation memory, team-shared notes, first-class data
+corrections with scope (inspection / well / well type), and surfaces conflicts
+instead of silently resolving them.
+
+## Links
+
+- Live demo: https://asset-copilot-mrun.streamlit.app/
+- Repository: https://github.com/Mrun25/oilops-copilot
+- Write-up (system design + results): https://github.com/Mrun25/oilops-copilot/blob/main/WRITEUP.md
+- Video narration script: https://github.com/Mrun25/oilops-copilot/blob/main/VIDEO_SCRIPT.md
+
+## Key files
+
+- app.py — Streamlit generative UI (chat, user picker, visual renderers)
+- copilot/loader.py — ingests the dataset folder (fleet JSON, per-well JSONL, repair reports, manuals/SOPs) into SQLite
+- copilot/engine.py — deterministic analytics and rule evaluation over SQL
+- copilot/router.py — Gemini LLM planner + deterministic fallback router + chat/correction memory
+- copilot/executor.py — answer composition: text, visual spec, evidence, conflict flags
+- tests/verify_scenarios.py — replays all 18 example scenarios from the organizers' 03-evaluation-queries.md
+- sample-data/ — the organizers' synthetic sample dataset (200 wells)
+
+## How to run
+
+pip install -r requirements.txt && streamlit run app.py
+(no API key required; set LLM_API_KEY/LLM_BASE_URL/LLM_MODEL for the LLM planner)
+
+## Verified capabilities
+
+All 18 example scenarios in the organizers' evaluation guide pass end to end
+(tests/verify_scenarios.py, 23/23 checks): status cards with rule-based
+producing verdicts, not-producing tables, temperature charts, spill counts with
+corrected detections excluded, downtime math, downtime ranking, spill maps,
+area-by-month heatmaps, compliance breach detection (SR-01/02/03, RC-04, RC-02),
+containment violations found in free-text repair reports, private per-user
+recall, data corrections that keep originals and propagate at the right scope,
+type-scoped team rules, and conflict surfacing between people and data.
+
+All field data is synthetic, supplied by the organizers for the challenge.
