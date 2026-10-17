@@ -21,7 +21,7 @@ RULES = {
 
 class Engine:
     def __init__(self, db_path):
-        self.db = sqlite3.connect(db_path)
+        self.db = sqlite3.connect(db_path, check_same_thread=False)  # Streamlit runs scripts across threads
         self.db.row_factory = sqlite3.Row
 
     def q(self, sql, args=()):
