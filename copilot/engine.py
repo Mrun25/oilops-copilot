@@ -225,7 +225,7 @@ class Engine:
                 resp = self.q("""SELECT * FROM reg_events WHERE asset_id=? AND event_type='nov_response_filed'
                                  AND date(date)>=date(?)""", (asset_id, nov['date']))
                 if not resp:
-                    item = {'protocol': 'RC-04', 'detail': f"NOV ({nov['date']}) unanswered; response was due {due2.isoformat()}; status {nov['status']}, fine USD {nov.get('fine_usd')}", 'evidence': [nov['detail']]}
+                    item = {'protocol': 'RC-04', 'detail': f"NOV ({nov['date']}) unanswered; response was due {due2.isoformat()}; status {nov['status']}, fine USD {int(nov.get('fine_usd') or 0):,}", 'evidence': [nov['detail']]}
                     (breaches if due2 < TODAY else pending).append(item)
         # RCA escalation (OM-T200 §10)
         for eq in ('wellhead','pump_jack','rod_string','downhole_pump','flowline','separator'):
