@@ -143,7 +143,7 @@ answers in English only.
   `LLM_BASE_URL`/`LLM_MODEL`. The planner is verified with `gemini-3.8-flash`
   (default); Google's open-weight **Gemma 4** (`gemma-4-31b-it`) is reachable on
   the same free endpoint — set `LLM_MODEL` to swap — and local models (e.g.
-  Ollama `gemma4:e2b`) work the same way. With no key at all, the deterministic
+  Ollama `gemma4:e2b`) work the same way. If the primary model rate-limits or 503s (free-tier congestion), the planner and translator retry automatically, then walk a free-model fallback chain (override with `LLM_FALLBACK_MODELS`). With no key at all, the deterministic
   router covers every intent offline — the demo can never hard-fail.
 
 ## Tech stack
