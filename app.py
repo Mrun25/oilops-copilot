@@ -65,7 +65,8 @@ st.markdown(f"""
   .cap .t {{ font-weight: 600; margin-bottom: 5px; color: {INK}; font-size: .92rem; }}
   .cap .d {{ color: {MUTED}; font-size: .82rem; line-height: 1.5; }}
   [data-testid="stMetric"] {{ background: {SURFACE}; border: 1px solid {HAIR}; border-radius: 10px; padding: 10px 14px; }}
-  [data-testid="stMetricValue"] {{ font-family: 'Fraunces', Georgia, serif; font-weight: 600; }}
+  [data-testid="stMetricValue"] {{ font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 1.5rem; }}
+  [data-testid="stMetricDelta"] {{ font-size: .78rem; }}
   .stChatMessage {{ background: transparent; border: none; }}
   [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {{
       background: {SURFACE}; border: 1px solid {HAIR}; border-radius: 10px; }}
@@ -160,7 +161,7 @@ def render_visual(resp):
             with st.container(border=True):
                 st.markdown(f'<div class="cardhead">{w["asset_id"]} · {w.get("name","")} · {w["well_type"]}</div>{pill}', unsafe_allow_html=True)
                 c1, c2, c3, c4 = st.columns(4)
-                c1.metric("Wellhead vs air", f"+{s['delta_c']}°C", f"limit +{s['threshold']:.0f}°C ({w['well_type']})")
+                c1.metric("Wellhead vs air", f"+{s['delta_c']}°C", f"+{s['threshold']:.0f}°C {w['well_type']} limit")
                 c2.metric("Recorded status", s['recorded_status'],
                           "out of date" if s['recorded_status'] == 'active' and not producing else "consistent",
                           delta_color="inverse" if s['recorded_status'] == 'active' and not producing else "normal")
