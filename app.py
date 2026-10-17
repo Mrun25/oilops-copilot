@@ -145,7 +145,7 @@ def render_visual(resp):
                           "out of date" if s['recorded_status'] == 'active' and not producing else "consistent",
                           delta_color="inverse" if s['recorded_status'] == 'active' and not producing else "normal")
                 c3.metric("Last inspection", s['inspection']['inspected_at'][:10], s['inspector'])
-                c4.metric("Inspection", s['inspection']['inspection_id'], s['inspection'].get('method', ''))
+                c4.metric("Inspection", s['inspection'].get('method', ''), s['inspection']['inspection_id'])
         elif v == 'table' and d.get('table'):
             st.dataframe(pd.DataFrame(d['table']), use_container_width=True, hide_index=True)
         elif v == 'line' and d.get('series'):
